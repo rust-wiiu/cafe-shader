@@ -144,6 +144,16 @@ pub struct VertexShader {
     pub program: [u32; 4],
 }
 
+fn extract_string(data: &[u8], patch_offset: u32) -> TokenStream {
+    let offset = (patch_offset & !Block::TEXT) as usize;
+
+    let str = std::ffi::CStr::from_bytes_until_nul(&data[offset..]).unwrap();
+
+    let str = syn::LitCStr::new(str, proc_macro2::Span::call_site());
+
+    quote! { #str.as_ptr() }
+}
+
 impl VertexShader {
     pub fn regs(&self) -> TokenStream {
         let sq_pgm_resources_vs = {
@@ -269,16 +279,7 @@ impl VertexShader {
                     let name = if s.name == 0 {
                         quote! { ::core::ptr::null() }
                     } else {
-                        let offset = (s.name & !Block::TEXT) as usize;
-                        let bytes = &data[offset..]
-                            .iter()
-                            .take_while(|&b| *b != 0)
-                            .cloned()
-                            .collect::<Vec<_>>();
-
-                        let str = String::from_utf8_lossy(&bytes);
-
-                        quote! { c"#str".as_ptr() }
+                        extract_string(&data, s.name)
                     };
                     let location = s.location;
                     let size = s.size;
@@ -293,7 +294,7 @@ impl VertexShader {
                 })
                 .collect::<Vec<TokenStream>>();
 
-            quote! {}
+            quote! { [#(#vec),*].as_ptr() }
         }
     }
 
@@ -356,20 +357,7 @@ impl VertexShader {
                     let name = if s.name == 0 {
                         quote! { ::core::ptr::null() }
                     } else {
-                        let offset = (s.name & !Block::TEXT) as usize;
-                        let bytes = &data[offset..]
-                            .iter()
-                            .take_while(|&b| *b != 0)
-                            .cloned()
-                            .collect::<Vec<_>>();
-
-                        let str = String::from_utf8_lossy(&bytes);
-                        let str = syn::LitCStr::new(
-                            std::ffi::CString::new(str.into_owned()).unwrap().as_c_str(),
-                            proc_macro2::Span::call_site(),
-                        );
-
-                        quote! { #str.as_ptr() }
+                        extract_string(&data, s.name)
                     };
 
                     let r#type = {
@@ -434,6 +422,142 @@ pub struct PixelShader {
     pub num_samplers: u32,
     pub sampler_vars: u32,
     pub program: [u32; 4],
+}
+
+impl PixelShader {
+    pub fn regs(&self) -> TokenStream {
+        let sq_pgm_resources_ps = {
+            let value = self.regs[0];
+            quote! { shader::registers::SQ_PGM_RESOURCES_PS::from_bits(#value) }
+        };
+
+        let sq_pgm_exports_ps = {
+            let value = self.regs[1];
+            quote! { shader::registers::SQ_PGM_EXPORTS_PS::from_bits(#value) }
+        };
+
+        let spi_ps_in_control_0 = {
+            let value = self.regs[2];
+            quote! { shader::registers::SPI_PS_IN_CONTROL_0::from_bits(#value) }
+        };
+
+        let spi_ps_in_control_1 = {
+            let value = self.regs[3];
+            quote! { shader::registers::SPI_PS_IN_CONTROL_1::from_bits(#value) }
+        };
+
+        let num_spi_ps_input_cntl = self.regs[4];
+
+        let spi_ps_input_cntls = self.regs[5..37].iter().map(|&reg| {
+            quote! { shader::registers::SPI_PS_INPUT_CNTL::from_bits(#reg) }
+        });
+
+        let cb_shader_mask = {
+            let value = self.regs[37];
+            quote! { shader::registers::CB_SHADER_MASK::from_bits(#value) }
+        };
+
+        let cb_shader_control = {
+            let value = self.regs[38];
+            quote! { shader::registers::CB_SHADER_CONTROL(#value) }
+        };
+
+        let db_shader_control = {
+            let value = self.regs[39];
+            quote! { shader::registers::DB_SHADER_CONTROL::from_bits(#value) }
+        };
+
+        let spi_input_z = {
+            let value = self.regs[40];
+            quote! { shader::registers::SPI_INPUT_Z::from_bits(#value) }
+        };
+
+        quote! {
+            shader::PixelShaderRegisters {
+                sq_pgm_resources_ps: #sq_pgm_resources_ps,
+                sq_pgm_exports_ps: #sq_pgm_exports_ps,
+                spi_ps_in_control_0: #spi_ps_in_control_0,
+                spi_ps_in_control_1: #spi_ps_in_control_1,
+                num_spi_ps_input_cntl: #num_spi_ps_input_cntl,
+                spi_ps_input_cntls: [#(#spi_ps_input_cntls),*],
+                cb_shader_mask: #cb_shader_mask,
+                cb_shader_control: #cb_shader_control,
+                db_shader_control: #db_shader_control,
+                spi_input_z: #spi_input_z,
+            }
+        }
+    }
+
+    pub fn shader_size(&self) -> TokenStream {
+        let value = self.shader_size;
+        quote! {#value }
+    }
+
+    pub fn shader_ptr(&self, program: &[u8]) -> TokenStream {
+        let len = program.len();
+        let bytes = program.iter().map(|b| quote! { #b }).collect::<Vec<_>>();
+        quote! {
+            {
+                static PROGRAM: Program<#len> = Program([#(#bytes),*]);
+                PROGRAM.0.as_ptr().cast()
+            }
+        }
+    }
+
+    pub fn shader_mode(&self) -> TokenStream {
+        let _ = cafe_sys::gx2::shader::ShaderMode::try_from(self.shader_mode).unwrap();
+        let value = self.shader_mode;
+        quote! { unsafe { ::core::mem::transmute(#value) } }
+    }
+
+    pub fn num_uniform_blocks(&self) -> TokenStream {
+        let value = self.num_uniform_blocks;
+        quote! {#value }
+    }
+
+    pub fn uniform_blocks(&self, data: &[u8]) -> TokenStream {
+        quote! { ::core::ptr::null() }
+    }
+
+    pub fn num_uniforms(&self) -> TokenStream {
+        let value = self.num_uniforms;
+        quote! { #value }
+    }
+
+    pub fn uniform_vars(&self, data: &[u8]) -> TokenStream {
+        quote! { ::core::ptr::null() }
+    }
+
+    pub fn num_initial_values(&self) -> TokenStream {
+        let value = self.num_initial_values;
+        quote! { #value }
+    }
+
+    pub fn initial_values(&self, data: &[u8]) -> TokenStream {
+        quote! { ::core::ptr::null() }
+    }
+
+    pub fn num_loops(&self) -> TokenStream {
+        let value = self.num_loops;
+        quote! { #value }
+    }
+
+    pub fn loop_vars(&self, data: &[u8]) -> TokenStream {
+        quote! { ::core::ptr::null() }
+    }
+
+    pub fn num_samplers(&self) -> TokenStream {
+        let value = self.num_samplers;
+        quote! { #value }
+    }
+
+    pub fn sampler_vars(&self, data: &[u8]) -> TokenStream {
+        quote! { ::core::ptr::null() }
+    }
+
+    pub fn program(&self) -> TokenStream {
+        quote! { unsafe { ::core::mem::MaybeUninit::zeroed().assume_init() } }
+    }
 }
 
 #[binrw]
@@ -571,11 +695,13 @@ mod tests {
         let mut file = shader();
         let gfd = Gfd::read(&mut file).unwrap();
 
-        let data = &gfd.blocks[0].data;
-        let program = &gfd.blocks[1].data;
+        let data = &gfd.blocks[2].data;
+        let program = &gfd.blocks[3].data;
 
-        let shader = gfd.blocks[0].vertex_shader().unwrap();
+        let shader = gfd.blocks[2].pixel_shader().unwrap();
 
         assert_eq!(shader.shader_size, program.len() as u32);
+
+        println!("{:X?}", shader);
     }
 }

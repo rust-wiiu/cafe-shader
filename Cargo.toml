@@ -1,7 +1,10 @@
 [package]
 name = "cafe-shader"
 version = "0.1.0"
+authors = ["29th-Day"]
 edition = "2024"
+license-file = "LICENSE"
+keywords = ["wiiu", "homebrew", "shader"]
 
 [lib]
 proc-macro = true

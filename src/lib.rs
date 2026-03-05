@@ -35,127 +35,6 @@ impl Parse for IncludeShaderInput {
     }
 }
 
-// fn pixel_shader_regs(regs: &cafe_sys::gx2::shader::PixelShaderRegisters) -> TokenStream {
-//     let sq_pgm_resources_ps = {
-//         let value = regs.sq_pgm_resources_ps.into_bits();
-//         quote! { shader::registers::SQ_PGM_RESOURCES_PS::from_bits(#value) }
-//     };
-
-//     let sq_pgm_exports_ps = {
-//         let value = regs.sq_pgm_exports_ps.into_bits();
-//         quote! { shader::registers::SQ_PGM_EXPORTS_PS::from_bits(#value) }
-//     };
-
-//     let spi_ps_in_control_0 = {
-//         let value = regs.spi_ps_in_control_0.into_bits();
-//         quote! { shader::registers::SPI_PS_IN_CONTROL_0::from_bits(#value) }
-//     };
-
-//     let spi_ps_in_control_1 = {
-//         let value = regs.spi_ps_in_control_1.into_bits();
-//         quote! { shader::registers::SPI_PS_IN_CONTROL_1::from_bits(#value) }
-//     };
-
-//     let num_spi_ps_input_cntl = regs.num_spi_ps_input_cntl;
-
-//     let spi_ps_input_cntls = regs.spi_ps_input_cntls.iter().map(|cntl| {
-//         let value = cntl.into_bits();
-//         quote! { shader::registers::SPI_PS_INPUT_CNTL::from_bits(#value) }
-//     });
-
-//     let cb_shader_mask = {
-//         let value = regs.cb_shader_mask.into_bits();
-//         quote! { shader::registers::CB_SHADER_MASK::from_bits(#value) }
-//     };
-
-//     let cb_shader_control = {
-//         let value = regs.cb_shader_control.0;
-//         quote! { shader::registers::CB_SHADER_CONTROL(#value) }
-//     };
-
-//     let db_shader_control = {
-//         let value = regs.db_shader_control.into_bits();
-//         quote! { shader::registers::DB_SHADER_CONTROL::from_bits(#value) }
-//     };
-
-//     let spi_input_z = {
-//         let value = regs.spi_input_z.into_bits();
-//         quote! { shader::registers::SPI_INPUT_Z::from_bits(#value) }
-//     };
-
-//     TokenStream::from(quote! {
-//         shader::PixelShaderRegisters {
-//             sq_pgm_resources_ps: #sq_pgm_resources_ps,
-//             sq_pgm_exports_ps: #sq_pgm_exports_ps,
-//             spi_ps_in_control_0: #spi_ps_in_control_0,
-//             spi_ps_in_control_1: #spi_ps_in_control_1,
-//             num_spi_ps_input_cntl: #num_spi_ps_input_cntl,
-//             spi_ps_input_cntls: [#(#spi_ps_input_cntls),*],
-//             cb_shader_mask: #cb_shader_mask,
-//             cb_shader_control: #cb_shader_control,
-//             db_shader_control: #db_shader_control,
-//             spi_input_z: #spi_input_z,
-//         }
-//     })
-// }
-
-// fn pixel_shader(ps: &cafe_sys::gx2::shader::PixelShader, program: &[u8]) -> TokenStream {
-//     let regs = proc_macro2::TokenStream::from(pixel_shader_regs(&ps.regs));
-
-//     let shader_size = ps.shader_size;
-//     let shader_ptr = {
-//         let len = program.len();
-//         let bytes = program.iter().map(|b| quote! { #b }).collect::<Vec<_>>();
-//         quote! {
-//             {
-//                 static PROGRAM: Program<#len> = Program([#(#bytes),*]);
-//                 PROGRAM.0.as_ptr().cast()
-//             }
-//         }
-//     };
-//     let shader_mode = match ps.shader_mode {
-//         cafe_sys::gx2::shader::ShaderMode::UniformRegister => {
-//             quote! { shader::ShaderMode::UniformRegister }
-//         }
-//         cafe_sys::gx2::shader::ShaderMode::UniformBlock => {
-//             quote! { shader::ShaderMode::UniformBlock }
-//         }
-//         cafe_sys::gx2::shader::ShaderMode::Geometry => quote! { shader::ShaderMode::Geometry },
-//         cafe_sys::gx2::shader::ShaderMode::Compute => quote! { shader::ShaderMode::Compute },
-//     };
-//     let num_uniform_blocks = ps.num_uniform_blocks;
-//     let uniform_blocks = quote! { [].as_ptr() };
-//     let num_uniforms = ps.num_uniforms;
-//     let uniform_vars = quote! { [].as_ptr() };
-//     let num_initial_values = ps.num_initial_values;
-//     let initial_values = quote! { [].as_ptr() };
-//     let num_loops = ps.num_loops;
-//     let loop_vars = quote! { [].as_ptr() };
-//     let num_samplers = ps.num_samplers;
-//     let sampler_vars = quote! { [].as_ptr() };
-//     let program = quote! { unsafe { std::mem::MaybeUninit::zeroed().assume_init() } };
-
-//     TokenStream::from(quote! {
-//         shader::PixelShader {
-//             regs: #regs,
-//             shader_size: #shader_size,
-//             shader_ptr: #shader_ptr,
-//             shader_mode: #shader_mode,
-//             num_uniform_blocks: #num_uniform_blocks,
-//             uniform_blocks: #uniform_blocks,
-//             num_uniforms: #num_uniforms,
-//             uniform_vars: #uniform_vars,
-//             num_initial_values: #num_initial_values,
-//             initial_values: #initial_values,
-//             num_loops: #num_loops,
-//             loop_vars: #loop_vars,
-//             num_samplers: #num_samplers,
-//             sampler_vars: #sampler_vars,
-//             program: #program,
-//         }
-//     })
-// }
-
 fn vertex_shader(vs: &gfd::VertexShader, data: &[u8], program: &[u8]) -> proc_macro2::TokenStream {
     let regs = vs.regs();
     let shader_size = vs.shader_size();
@@ -204,6 +83,54 @@ fn vertex_shader(vs: &gfd::VertexShader, data: &[u8], program: &[u8]) -> proc_ma
     }
 }
 
+fn pixel_shader(ps: &gfd::PixelShader, data: &[u8], program: &[u8]) -> proc_macro2::TokenStream {
+    let regs = ps.regs();
+    let shader_size = ps.shader_size();
+    let shader_ptr = ps.shader_ptr(&program);
+    let shader_mode = ps.shader_mode();
+    let num_uniform_blocks = ps.num_uniform_blocks();
+    let uniform_blocks = ps.uniform_blocks(data);
+    let num_uniforms = ps.num_uniforms();
+    let uniform_vars = ps.uniform_vars(data);
+    let num_initial_values = ps.num_initial_values();
+    let initial_values = ps.initial_values(data);
+    let num_loops = ps.num_loops();
+    let loop_vars = ps.loop_vars(data);
+    let num_samplers = ps.num_samplers();
+    let sampler_vars = ps.sampler_vars(data);
+    let program = ps.program();
+
+    quote! {
+        shader::PixelShader {
+            regs: #regs,
+            shader_size: #shader_size,
+            shader_ptr: #shader_ptr,
+            shader_mode: #shader_mode,
+            num_uniform_blocks: #num_uniform_blocks,
+            uniform_blocks: #uniform_blocks,
+            num_uniforms: #num_uniforms,
+            uniform_vars: #uniform_vars,
+            num_initial_values: #num_initial_values,
+            initial_values: #initial_values,
+            num_loops: #num_loops,
+            loop_vars: #loop_vars,
+            num_samplers: #num_samplers,
+            sampler_vars: #sampler_vars,
+            program: #program,
+        }
+    }
+}
+
+/// Parse a GSH shader file into a Rust struct
+///
+/// # Example
+///
+/// ```
+/// use cafe_shader::include_shader;
+/// include_shader!(MY_SHADER, "path/to/shader.gsh");
+///
+/// use_shader(MY_SHADER.vertex[0], MY_SHADER.pixel[0]);
+/// ```
 #[proc_macro]
 pub fn include_shader(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as IncludeShaderInput);
@@ -247,7 +174,9 @@ pub fn include_shader(input: TokenStream) -> TokenStream {
 
                 //
 
-                pixel_shaders.push(todo.clone());
+                let shader = header.pixel_shader().unwrap();
+
+                pixel_shaders.push(pixel_shader(&shader, &header.data, &program.data));
             }
             _ => continue,
         }
